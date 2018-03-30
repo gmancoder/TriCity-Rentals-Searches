@@ -1,0 +1,518 @@
+PropertyManager propertyMan = new PropertyManager();
+public ClientScriptManager csm;
+public double center_lat;
+public double center_long;
+public int zoom;
+public string js;
+public string outerJS = "";
+public string map_pins_dir = "/Images/list_map/pins/";
+public int start_pin = 1;
+protected void Page_Load(object sender, EventArgs e)
+{
+    rptResultsMap.ItemDataBound += new RepeaterItemEventHandler(rptResultsMap_ItemDataBound);
+    rptSearchResultsMap.ItemDataBound += new RepeaterItemEventHandler(rptSearchResultsMap_ItemDataBound);
+    csm = Page.ClientScript;
+    
+    js = "";
+    lnbDetailViewTab.Click += new EventHandler(lnbDetailViewTab_Click);
+    lnbLocateItTab.Click += new EventHandler(lnbLocateItTab_Click);
+    //csm.RegisterClientScriptBlock(Page.GetType(), "MapInit()", "alert('Hi');", true);
+    if (!Page.IsPostBack)
+    {
+        DetailView();
+    }
+}
+
+void rptSearchResultsMap_ItemDataBound(object sender, RepeaterItemEventArgs e)
+{
+    HiddenField property_id_map = (HiddenField)e.Item.FindControl("property_id_map");
+    if (property_id_map != null)
+    {
+        string pin = map_pins_dir + "number_" + start_pin + ".png";
+        Image imgPin = (Image)e.Item.FindControl("imgPin");
+        imgPin.ImageUrl = pin;
+        Property currentProperty = propertyMan.GetSingleProperty(new Guid(property_id_map.Value));
+        outerJS += " var specialsUrl_" + start_pin + " = '/Components/PropertyManager/Specials.aspx?property_id=" + currentProperty.ID + "'; ";
+        string info_window = "<div class=\"map-content-image\"><img src=\"" + currentProperty.SearchResultImage + "\" alt=\"" + currentProperty.Name + "\" width=\"118\" border=\"0\" /></div><div class=\"map-name\"><a href=\"" + currentProperty.Url + "\">" + currentProperty.Name + "</a></div><div class=\"map-content-address\">" + RenderAddress(new Guid(property_id_map.Value)) + "</div><div class=\"map-content-attributes\">" + BindPropertyAttributes(currentProperty.ID) + "</div>";
+        info_window += "<div class=\"map-content-configurations\">" + BindConfigurations(currentProperty.ID) + "</div>";
+        info_window += "<div class=\"map-content-specials\">" + BindSpecialsMap(currentProperty.ID) + "</div>";
+        info_window += "<div class=\"break\"></div>";
+        info_window += "<div class=\"map-content-amenities\">" + BindFeaturedAmenities(currentProperty.ID) + "</div>";
+        js += @"var infowindow_" + start_pin + @" = new google.maps.InfoWindow({
+            content: '" + info_window + @"'
+        });";
+
+        js += @"
+            var myLatlng = new google.maps.LatLng(" + currentProperty.Address.Latitude + @", " + currentProperty.Address.Longitude + @");
+            var marker_" + start_pin + @" = new google.maps.Marker({
+                  position: myLatlng,
+                  map: map,
+                  icon: '" + pin + @"'
+              });";
+
+        js += @"google.maps.event.addListener(marker_" + start_pin + @", 'click', function() {
+              infowindow_" + start_pin + @".open(map,marker_" + start_pin + @");
+            });";
+
+
+        start_pin++;
+
+
+    }
+}
+
+void rptResultsMap_ItemDataBound(object sender, RepeaterItemEventArgs e)
+{
+    HiddenField property_id_map_other = (HiddenField)e.Item.FindControl("property_id_map_other");
+    if (property_id_map_other != null)
+    {
+        string pin = map_pins_dir + "number_"+start_pin+".png";
+        Image imgPin = (Image)e.Item.FindControl("imgPin");
+        imgPin.ImageUrl = pin;
+        Property currentProperty = propertyMan.GetSingleProperty(new Guid(property_id_map_other.Value));
+        outerJS += " var specialsUrl_" + start_pin + " = '/Components/PropertyManager/Specials.aspx?property_id=" + currentProperty.ID + "'; ";
+        string info_window = "<div class=\"map-content-image\"><img src=\"" + currentProperty.SearchResultImage + "\" alt=\"" + currentProperty.Name + "\" width=\"118\" border=\"0\" /></div><div class=\"map-name\"><a href=\"" + currentProperty.Url + "\">" + currentProperty.Name + "</a></div><div class=\"map-content-address\">" + RenderAddress(new Guid(property_id_map_other.Value)) + "</div><div class=\"map-content-attributes\">"+BindPropertyAttributes(currentProperty.ID)+"</div>";
+        info_window += "<div class=\"map-content-configurations\">" + BindConfigurations(currentProperty.ID) + "</div>";
+        info_window += "<div class=\"map-content-specials\">" + BindSpecialsMap(currentProperty.ID) + "</div>";
+        info_window += "<div class=\"break\"></div>";
+        info_window += "<div class=\"map-content-amenities\">" + BindFeaturedAmenities(currentProperty.ID) + "</div>";
+        js += @"var infowindow_" + start_pin + @" = new google.maps.InfoWindow({
+            content: '" + info_window + @"'
+        });";
+        
+        js += @"
+            var myLatlng = new google.maps.LatLng(" + currentProperty.Address.Latitude + @", " + currentProperty.Address.Longitude + @");
+            var marker_" + start_pin + @" = new google.maps.Marker({
+                  position: myLatlng,
+                  map: map,
+                  icon: '" + pin + @"'
+              });";
+
+        js += @"google.maps.event.addListener(marker_" + start_pin + @", 'click', function() {
+              infowindow_" + start_pin + @".open(map,marker_" + start_pin + @");
+            });";
+
+
+        start_pin++;
+
+
+    }
+}
+
+public string RenderAddress(Guid property_id)
+{
+    Property currentProperty = propertyMan.GetSingleProperty(property_id);
+    string address = "";
+    PropertyAddress currentAddress = currentProperty.Address;
+    address += currentAddress.AddressLine1;
+    if (currentAddress.AddressLine2 != "")
+    {
+        address += "<br />" + currentAddress.AddressLine2;
+    }
+    address += "<br />" + currentAddress.City + ", " + currentAddress.State + " " + currentAddress.ZipCode;
+    if (currentAddress.PhoneNumber != "")
+    {
+        address += "<br />" + currentAddress.PhoneNumber;
+    }
+
+    if (currentAddress.Latitude == 0 && currentAddress.Longitude == 0)
+    {
+        Geocode.GeoCodeProperty(ref currentProperty);
+        propertyMan.SaveProperty(currentProperty);
+    }
+
+    return address;
+}
+
+public string BindPropertyAttributes(Guid property_id)
+{
+    Property currentProperty = propertyMan.GetSingleProperty(property_id);
+    string attributes = "";
+    string alt = "";
+    if (currentProperty.LaundryInUnit || currentProperty.LaundryOnPremises)
+    {
+        if (currentProperty.LaundryInUnit)
+        {
+            alt = "Laundry In Unit";
+        }
+        if (currentProperty.LaundryOnPremises)
+        {
+            if (alt != "")
+            {
+                alt += " / On Premises";
+            }
+            else
+            {
+                alt = "Laundry On Premises";
+            }
+        }
+        attributes += "<div class=\"listing-category-icon\"><img src=\"/images/list_map/laundry.jpg\" alt=\"" + alt + "\" title=\"" + alt + "\" width=\"28\" height=\"28\" /></div>";
+    }
+
+    if (currentProperty.UtilitiesIncluded)
+    {
+        alt = "Utilities Included";
+        attributes += "<div class=\"listing-category-icon\"><img src=\"/images/list_map/utilities.jpg\" alt=\"" + alt + "\" title=\"" + alt + "\" width=\"28\" height=\"28\" /></div>";
+    }
+
+    if (currentProperty.SmokeFreeBuilding)
+    {
+        alt = "Smoke-Free Building";
+        attributes += "<div class=\"listing-category-icon\"><img src=\"/images/list_map/smoking.jpg\" alt=\"" + alt + "\" title=\"" + alt + "\" width=\"28\" height=\"28\" /></div>";
+    }
+
+    if (currentProperty.PetFriendlyCat || currentProperty.PetFriendlyDog)
+    {
+        if (currentProperty.PetFriendlyCat)
+        {
+            alt = "Cat Friendly";
+        }
+        if (currentProperty.PetFriendlyDog)
+        {
+            if (alt != "")
+            {
+                alt += ", Dog Friendly";
+            }
+            else
+            {
+                alt = "Dog Friendly";
+            }
+        }
+        attributes += "<div class=\"listing-category-icon\"><img src=\"/images/list_map/pets.jpg\" alt=\"" + alt + "\" title=\"" + alt + "\" width=\"28\" height=\"28\" /></div>";
+    }
+
+    return attributes;
+}
+
+public string BindConfigurations(Guid property_id)
+{
+    Property currentProperty = propertyMan.GetSingleProperty(property_id);
+    string configs = "";
+    double[] priceList = {0,0,0,0};
+    foreach (PropertyConfiguration config in currentProperty.Configurations)
+    {
+        for (int i = 0; i < priceList.Length; i++)
+        {
+            if (config.NumberofBedrooms == i && (config.PriceLowerBound < priceList[i] || priceList[i] == 0))
+            {
+                priceList[i] = config.PriceLowerBound;
+            }
+        }
+    }
+
+    for (int i = 0; i < priceList.Length; i++)
+    {
+        if (priceList[i] != 0)
+        {
+            if (configs != "")
+            {
+                configs += "<br />";
+            }
+            if (i != 0)
+            {
+                configs += i + " Bedroom from $" + priceList[i];
+            }
+            else
+            {
+                configs += "Studio from $" + priceList[i];
+            }
+        }
+    }
+
+    return configs;
+}
+
+public string BindFeaturedAmenities(Guid property_id)
+{
+    Property currentProperty = propertyMan.GetSingleProperty(property_id);
+    string amenities = "";
+    foreach (PropertyAmenity amen in currentProperty.Amenities)
+    {
+        if (amen.Featured)
+        {
+            if (amenities != "")
+            {
+                amenities += ", ";
+            }
+            amenities += amen.Name;
+        }
+    }
+
+    if (amenities != "")
+    {
+        return "<strong>Featured Amenities:</strong> " + amenities;
+    }
+    return "";
+}
+
+public string BindSpecials(Guid property_id)
+{
+    Property currentProperty = propertyMan.GetSingleProperty(property_id);
+    if (currentProperty.Specials != "")
+    {
+        return "<a href=\"/Components/PropertyManager/Specials.aspx?property_id=" + property_id + "\" onclick=\"openWin('/Components/PropertyManager/Specials.aspx?property_id=" + currentProperty.ID + "'); return false;\" class=\"listing-item-specials\">Specials</a>";
+    }
+    return "";
+}
+
+public string BindSpecialsMap(Guid property_id)
+{
+    Property currentProperty = propertyMan.GetSingleProperty(property_id);
+    if (currentProperty.Specials != "")
+    {
+        return "<a href=\"/Components/PropertyManager/Specials.aspx?property_id=" + property_id + "\" onclick=\"openWin(specialsUrl_" + start_pin + "); return false;\" class=\"listing-item-specials\">Specials</a>";
+    }
+    return "";
+}
+
+void lnbLocateItTab_Click(object sender, EventArgs e)
+{
+    csm.RegisterClientScriptBlock(Page.GetType(), "MapInit()", "alert('Hi');", true);
+    LocateItView();
+}
+
+void lnbDetailViewTab_Click(object sender, EventArgs e)
+{
+    DetailView();
+}
+public string GetFilterString()
+{
+    string where = "";
+    if (Request.QueryString["neighborhood"] != null && Request.QueryString["neighborhood"] != "")
+    {
+        pnlSearchResults.Visible = true;
+        pnlSearchResultsMap.Visible = true;
+        pnlNeighborhoodTitle.Visible = true;
+        pnlNeighborhoodNameMap.Visible = true;
+        string hood = Request.QueryString["neighborhood"];
+        if (hood != "" && hood.Substring(0, 1) == "N")
+        {
+            hood = hood.Remove(0, 1);
+            where += " neighborhood_id = '" + hood + "' ";
+            PropertyNeighborhood nHood = propertyMan.GetSingleNeighborhood(new Guid(hood));
+            litNeighborhoodTitle.Text = nHood.Name;
+            litNeighborhoodNameMap.Text = nHood.Name;
+        }
+        else if (hood != "" && hood.Substring(0, 1) == "P")
+        {
+            hood = hood.Remove(0, 1);
+            where += " id = '" + hood + "' ";
+            Property prop = propertyMan.GetSingleProperty(new Guid(hood));
+            litNeighborhoodTitle.Text = prop.Neighborhood.Name;
+            litNeighborhoodNameMap.Text = prop.Neighborhood.Name;
+        }
+    }
+
+    if (Request.QueryString["bedrooms"] != null && Request.QueryString["bedrooms"] != "")
+    {
+        pnlSearchResults.Visible = true;
+        pnlSearchResultsMap.Visible = true;
+        try
+        {
+            int bedrooms = Convert.ToInt32(Request.QueryString["bedrooms"]);
+
+            if (where != "")
+            {
+                where += " AND ";
+            }
+            where += " id in (select property_id from tcr_property_configuration where bedrooms = " + bedrooms + ") ";
+        }
+        catch { }
+    }
+
+    if (Request.QueryString["price"] != null && Request.QueryString["price"] != "")
+    {
+        pnlSearchResults.Visible = true;
+        pnlSearchResultsMap.Visible = true;
+        try
+        {
+            double price = Convert.ToDouble(Request.QueryString["price"]);
+
+            if (where != "")
+            {
+                where += " AND ";
+            }
+            where += " id in (select property_id from tcr_property_configuration where price_upper_bound <= " + price + ") ";
+        }
+        catch { }
+    }
+
+    if (Request.QueryString["cat"] != null && Request.QueryString["cat"] != "")
+    {
+
+        try
+        {
+            bool cat = false;
+            switch (Request.QueryString["cat"])
+            {
+                case "True":
+                    cat = true;
+                    break;
+            }
+
+            if (cat)
+            {
+                pnlSearchResults.Visible = true;
+                pnlSearchResultsMap.Visible = true;
+                if (where != "")
+                {
+                    where += " AND ";
+                }
+                where += " pet_cat = " + Convert.ToInt32(cat);
+            }
+        }
+        catch { }
+    }
+
+    if (Request.QueryString["dog"] != null && Request.QueryString["dog"] != "")
+    {
+
+        try
+        {
+            bool dog = false;
+            switch (Request.QueryString["dog"])
+            {
+                case "True":
+                    dog = true;
+                    break;
+            }
+
+            if (dog)
+            {
+                pnlSearchResults.Visible = true;
+                pnlSearchResultsMap.Visible = true;
+                if (where != "")
+                {
+                    where += " AND ";
+                }
+                where += " pet_dog = " + Convert.ToInt32(dog);
+            }
+        }
+        catch { }
+    }
+
+    if (Request.QueryString["zipcode"] != null && Request.QueryString["zipcode"] != "")
+    {
+        pnlSearchResults.Visible = true;
+        pnlSearchResultsMap.Visible = true;
+        try
+        {
+            string zipcode = Request.QueryString["zipcode"];
+
+            if (where != "")
+            {
+                where += " AND ";
+            }
+            where += " id in (select tcr_property_address where zip = '" + zipcode + "' ";
+        }
+        catch { }
+    }
+
+    return where;
+}
+public void DetailView()
+{
+    TurnOff(ref lnbLocateItTab);
+    TurnOn(ref lnbDetailViewTab);
+
+    string where = GetFilterString();
+    if (RegionID != null & RegionID != Guid.Empty)
+    {
+        if (where != "")
+        {
+            rptSearchResults.DataSource = propertyMan.GetAllProperties("region_id = '" + RegionID + "' AND " + where, "", 0);
+            rptResults.DataSource = propertyMan.GetAllProperties("region_id = '"+RegionID+"' AND NOT (" + where + ")  ", "", 0);
+            rptSearchResults.DataBind();
+            rptResults.DataBind();
+
+            if (rptResults.Items.Count == 0)
+            {
+                pnlOtherListing.Visible = false;
+            }
+        }
+        else
+        {
+            rptResults.DataSource = propertyMan.GetAllProperties("region_id = '" + RegionID + "' ", "", 0);
+            rptResults.DataBind();
+        }
+    }
+
+    mvSearchViews.SetActiveView(vwDetail);
+}
+
+public void LocateItView()
+{
+    TurnOff(ref lnbDetailViewTab);
+    TurnOn(ref lnbLocateItTab);
+
+    string where = GetFilterString();
+
+    if (RegionID != null & RegionID != Guid.Empty)
+    {
+        PropertyRegion currentRegion = propertyMan.GetSingleRegion(RegionID);
+        IList<Property> propertyList = new List<Property>();
+        if (where != "")
+        {
+            propertyList = propertyMan.GetAllProperties("region_id = '" + RegionID + "' AND " + where, "", 0);
+            rptSearchResultsMap.DataSource = propertyList;
+            rptResultsMap.DataSource = propertyMan.GetAllProperties("region_id = '" + RegionID + "' AND NOT (" + where + ")  ", "", 0);
+            rptSearchResultsMap.DataBind();
+            rptResultsMap.DataBind();
+
+            if (rptResultsMap.Items.Count == 0)
+            {
+                pnlOtherListingMap.Visible = false;
+            }
+        }
+        else
+        {
+            propertyList = propertyMan.GetAllProperties("region_id = '" + RegionID + "' ", "", 0);
+            rptResultsMap.DataSource = propertyList;
+            rptResultsMap.DataBind();
+        }
+
+        center_lat = currentRegion.CenterLatitude;
+        center_long = currentRegion.CenterLongitude;
+        zoom = currentRegion.DefaultZoom;
+    }
+
+    mvSearchViews.SetActiveView(vwLocate);
+}
+
+public void TurnOff(ref LinkButton lnb)
+{
+    string classes = lnb.CssClass;
+    IList<string> classList = classes.Split(' ').ToList<string>();
+    classList.Remove("tab-on");
+    lnb.CssClass = "";
+    foreach (string cls in classList)
+    {
+        lnb.CssClass += cls + " ";
+    }
+}
+
+public void TurnOn(ref LinkButton lnb)
+{
+    string classes = lnb.CssClass;
+    IList<string> classList = classes.Split(' ').ToList<string>();
+    classList.Add("tab-on");
+    lnb.CssClass = "";
+    foreach (string cls in classList)
+    {
+        lnb.CssClass += cls + " ";
+    }
+}
+
+private Guid _region_id;
+[WebEditor("TriCityRentals.PropertyControls.RegionSelector, App_Code")]
+public Guid RegionID
+{
+    get
+    {
+        return _region_id;
+    }
+    set
+    {
+        _region_id = value;
+    }
+}
